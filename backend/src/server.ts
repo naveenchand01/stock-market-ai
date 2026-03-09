@@ -42,7 +42,7 @@ app.use(errorHandler);
 
 // Start server
 const PORT = env.PORT;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   logger.info(`🚀 Server running on port ${PORT}`);
   logger.info(`📊 Environment: ${env.NODE_ENV}`);
   logger.info(`🌐 Frontend URL: ${env.FRONTEND_URL}`);
