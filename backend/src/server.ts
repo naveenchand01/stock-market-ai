@@ -48,6 +48,7 @@ app.listen(PORT, () => {
   logger.info(`🌐 Frontend URL: ${env.FRONTEND_URL}`);
   logger.info(`📈 Using Yahoo Finance API for real-time stock data`);
   logger.info(`✅ Server is ready to accept requests`);
+  console.log('🔄 Restarted backend to pick up new .env credentials');
 });
 
 // Graceful shutdown

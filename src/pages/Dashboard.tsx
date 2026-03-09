@@ -1,18 +1,36 @@
+import { useState } from 'react';
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StockCard } from "@/components/market/StockCard";
 import { IndexCard } from "@/components/market/IndexCard";
 import { MiniChart } from "@/components/market/MiniChart";
 import { InsightCard } from "@/components/insights/InsightCard";
+import { StockSearch } from "@/components/market/StockSearch";
 import { Button } from "@/components/ui/button";
-import { generateChartData } from "@/data/mockData";
-import { useWatchlistStocks, useMarketIndices, useTopGainers, useTopLosers, useHighVolume } from "@/hooks/useStocks";
-import { TrendingUp, TrendingDown, BarChart3, Plus, MessageSquare, Sparkles } from "lucide-react";
+import { useWatchlistStocks, useMarketIndices, useTopGainers, useTopLosers, useHighVolume, useHistoricalData } from "@/hooks/useStocks";
+import { useWatchlist } from "@/hooks/useWatchlist";
+import { TrendingUp, TrendingDown, BarChart3, MessageSquare, Sparkles, X } from "lucide-react";
 import { motion } from "framer-motion";
+import { TopStock } from "@/types/stock.types";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "react-router-dom";
 
 const Dashboard = () => {
-  // Watchlist symbols - can be made dynamic later (e.g., from user preferences)
-  const watchlistSymbols = ['TCS', 'INFY', 'RELIANCE', 'HDFCBANK', 'ICICIBANK', 'WIPRO'];
+  // Watchlist Management (now synced with Firestore)
+  const { watchlist: watchlistSymbols, addToWatchlist, removeFromWatchlist, loading: watchlistLoading } = useWatchlist();
+
+  // State for selected time period
+  const [timePeriod, setTimePeriod] = useState("1d");
+  const [overviewSymbol, setOverviewSymbol] = useState("^NSEI"); // Default to Nifty 50
+
+  // Fetch historical data for the overview chart
+  const { data: historicalData = [], isLoading: loadingHistory } = useHistoricalData(overviewSymbol, timePeriod, timePeriod === "1d" ? "5m" : "1d");
+
+  // Transform historical data for MiniChart
+  const chartData = historicalData.map(item => ({
+    time: new Date(item.date).getTime() / 1000,
+    value: item.close
+  }));
 
   // Fetch data using React Query hooks
   const { data: watchlistStocks = [], isLoading: loadingWatchlist, error: watchlistError } = useWatchlistStocks(watchlistSymbols);
@@ -21,9 +39,56 @@ const Dashboard = () => {
   const { data: topLosers = [] } = useTopLosers();
   const { data: highVolume = [] } = useHighVolume();
 
-  const intradayData = generateChartData(50, "volatile");
-
   // Loading state
+  const renderStockList = (stocks: TopStock[]) => {
+    return (
+      <div className="glass-card rounded-xl overflow-hidden mt-6">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Company</TableHead>
+              <TableHead className="text-right">Market Price</TableHead>
+              <TableHead className="text-right">Volume</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {stocks.map((stock) => (
+              <TableRow key={stock.symbol}>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
+                      {stock.symbol.substring(0, 1)}
+                    </div>
+                    <div>
+                      <div className="font-semibold">{stock.name || stock.symbol}</div>
+                      <div className="text-sm text-muted-foreground">{stock.symbol}</div>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="font-medium">₹{stock.price ? stock.price.toFixed(2) : stock.value}</div>
+                  <div className={`text-sm font-mono ${(stock.changePercent ?? stock.change) >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {(stock.changePercent ?? stock.change) >= 0 ? '+' : ''}{(stock.changePercent ?? stock.change ?? 0).toFixed(2)}%
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="font-medium">{stock.volume ? stock.volume.toLocaleString() : '-'}</div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {stocks.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
+                  No stocks found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  };
+
   if (loadingWatchlist || loadingIndices || loadingGainers) {
     return (
       <DashboardLayout>
@@ -79,14 +144,32 @@ const Dashboard = () => {
           <div className="glass-card p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold">Watchlist</h2>
-              <Button variant="ghost" size="sm">
-                <Plus className="h-4 w-4" />
-              </Button>
+              <StockSearch onSelect={addToWatchlist} />
             </div>
             <div className="space-y-3">
               {watchlistStocks.map((stock) => (
-                <StockCard key={stock.symbol} {...stock} />
+                <div key={stock.symbol} className="relative group">
+                  <StockCard {...stock} />
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      removeFromWatchlist(stock.symbol);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
               ))}
+              {watchlistStocks.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  Your watchlist is empty.
+                  <br />
+                  Search to add stocks.
+                </div>
+              )}
             </div>
           </div>
         </motion.div>
@@ -102,31 +185,45 @@ const Dashboard = () => {
           <div className="overflow-x-auto pb-2 -mx-4 px-4">
             <div className="flex gap-4" style={{ minWidth: "fit-content" }}>
               {marketIndices.map((index) => (
-                <IndexCard key={index.name} {...index} />
+                <IndexCard
+                  key={index.name}
+                  {...index}
+                  isActive={overviewSymbol === index.symbol}
+                  onClick={() => {
+                    if (index.symbol) setOverviewSymbol(index.symbol);
+                  }}
+                />
               ))}
             </div>
           </div>
 
-          {/* Intraday Chart */}
+          {/* Chart Overview */}
           <div className="glass-card p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="font-semibold">Intraday Overview</h3>
-                <p className="text-sm text-muted-foreground">Market performance today</p>
+                <h3 className="font-semibold">
+                  {marketIndices.find((idx) => idx.symbol === overviewSymbol)?.name || 'Market Overview'} ({overviewSymbol})
+                </h3>
+                <p className="text-sm text-muted-foreground">Performance trend</p>
               </div>
               <div className="flex gap-2">
-                {["1D", "1W", "1M", "3M"].map((period) => (
+                {["1d", "1mo", "3mo", "1y"].map((period) => (
                   <Button
                     key={period}
-                    variant={period === "1D" ? "default" : "ghost"}
+                    variant={timePeriod === period ? "default" : "ghost"}
                     size="sm"
+                    onClick={() => setTimePeriod(period)}
                   >
-                    {period}
+                    {period.toUpperCase()}
                   </Button>
                 ))}
               </div>
             </div>
-            <MiniChart data={intradayData} height={200} color="primary" />
+            {loadingHistory ? (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
+            ) : (
+              <MiniChart data={chartData} height={200} color="primary" showAxis={true} />
+            )}
           </div>
 
           {/* Ask Avatar CTA */}
@@ -191,6 +288,40 @@ const Dashboard = () => {
             </Button>
           </Link>
         </motion.div>
+      </div>
+
+      {/* Market Data Explorer */}
+      <div className="mt-8">
+        <div className="mb-4">
+          <h2 className="text-xl font-bold mb-1">Market Movers</h2>
+          <p className="text-sm text-muted-foreground">Discover top performing and high volume stocks today.</p>
+        </div>
+
+        <Tabs defaultValue="gainers" className="w-full">
+          <TabsList className="bg-secondary/50">
+            <TabsTrigger value="gainers" className="gap-2">
+              <TrendingUp className="h-4 w-4" /> Top gainers
+            </TabsTrigger>
+            <TabsTrigger value="losers" className="gap-2">
+              <TrendingDown className="h-4 w-4" /> Top losers
+            </TabsTrigger>
+            <TabsTrigger value="volume" className="gap-2">
+              <BarChart3 className="h-4 w-4" /> High volume
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="gainers">
+            {loadingGainers ? <div className="text-center py-10 text-muted-foreground">Loading market data...</div> : renderStockList(topGainers)}
+          </TabsContent>
+
+          <TabsContent value="losers">
+            {loadingGainers ? <div className="text-center py-10 text-muted-foreground">Loading market data...</div> : renderStockList(topLosers)}
+          </TabsContent>
+
+          <TabsContent value="volume">
+            {loadingGainers ? <div className="text-center py-10 text-muted-foreground">Loading market data...</div> : renderStockList(highVolume)}
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );

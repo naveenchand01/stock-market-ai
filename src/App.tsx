@@ -11,6 +11,8 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import { StockDetails } from "./pages/StockDetails";
 import Avatar from "./pages/Avatar";
+import Alerts from "./pages/Alerts";
+import Admin from "./pages/Admin";
 import Forecast from "./pages/Forecast";
 import News from "./pages/News";
 import Watchlist from "./pages/Watchlist";
@@ -78,6 +80,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Watchlist />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/alerts"
+              element={
+                <ProtectedRoute>
+                  <Alerts />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <Admin />
                 </ProtectedRoute>
               }
             />

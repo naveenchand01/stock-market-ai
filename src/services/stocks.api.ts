@@ -10,6 +10,13 @@ export const stocksApi = {
   },
 
   /**
+   * Search for stocks
+   */
+  search: async (query: string): Promise<any> => {
+    return apiClient.get(`/stocks/search?q=${encodeURIComponent(query)}`);
+  },
+
+  /**
    * Get quotes for multiple stocks
    */
   getWatchlist: async (symbols: string[]): Promise<Stock[]> => {
@@ -53,5 +60,14 @@ export const stocksApi = {
     interval: string = '1d'
   ): Promise<HistoricalData[]> => {
     return apiClient.get(`/stocks/historical/${symbol}?period=${period}&interval=${interval}`);
+  },
+
+  /**
+   * Get live news with AI sentiment analysis
+   */
+  getNews: async (query?: string): Promise<any[]> => {
+    const params = query ? `?symbolParam=${encodeURIComponent(query)}` : '';
+    const response: any = await apiClient.get(`/stocks/news${params}`);
+    return response || [];
   },
 };
